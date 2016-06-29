@@ -1,8 +1,13 @@
 object Main {
   def main(args: Array[String]) {
-    val spec = """[(col5),col4,col3,col2+","+col1]"""
-    val row = Seq("foo","bar","baz","17","true")
+    val spec = """[(col5),col4+' -- '+col3,col2+","+col1]"""
+    val row = List("alpha","bravo","charlie","delta","echo")
 
-    println(transform.ImportTransformer(spec))
+    val ast = transform.ImportTransformer(spec)
+    println(ast)
+    ast match {
+      case Some(parsed) => println(parsed(row))
+      case None => println("Failed to parse!")
+    }
   }
 }
