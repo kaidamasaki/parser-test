@@ -1,6 +1,6 @@
 package transform
 
-import scala.util.matching.Regex
+import java.util.regex.Pattern
 
 import com.rojoma.json.v3.util.JsonUtil
 import com.rojoma.json.v3.ast.{JNumber, JObject, JString, JValue}
@@ -61,24 +61,24 @@ package object ast {
         orElse(Wrapped(tokens)).
         orElse(Object(tokens))
 
-      val ret = parseFunc(expr)
       println(s"Expr: $expr")
-      println(s"parseFunc: $ret")
-
-      ret.orElse(expr)
+      parseFunc(expr, None)
     }
 
     def concat(tokens: List[String], left: Expr): Result[Func] =
-      Expr(tokens).map { case (right, rest) => Func("+", List(left, right)) -> rest }
+      Expr(tokens).map { case (right, rest) => Func("+", List(left, right), None) -> rest }
 
-    def parseFunc(expr: Result[Expr]): Result[Expr] = expr match {
-      case Some((next, Nil)) => Some(next, Nil)
-      case Some((next, "+" :: rest)) =>
-        parseFunc(concat(rest, next))
-      case Some((next, "(" :: rest)) =>
-        parseFunc(Func(rest, next))
-      case e @ Some(_) => e
-      case _ => None
+    def parseFunc(expr: Result[Expr], self: Option[Expr]): Result[Expr] = {
+      println(s"parseFunc: $expr / $self")
+
+      (expr, self) match {
+        case (Some((next, Nil)), _) => Some(next, Nil)
+        case (Some((left, "+" :: rest)), _) => parseFunc(concat(rest, left), self)
+        case (Some((name, "(" :: rest)), _) => parseFunc(Func(rest, name, self), None)
+        case (Some((newSelf, "." :: rest)), None) => parseFunc(Id(rest), Some(newSelf))
+        case (Some(result), None) => Some(result)
+        case _ => None
+      }
     }
   }
 
@@ -112,23 +112,26 @@ package object ast {
     }
   }
 
-  case class Func(name: String, args: List[Expr]) extends Expr {
+  case class Func(name: String, args: List[Expr], self: Option[Expr]) extends Expr {
     def parseArgs(bindings: Map[String, String]) = sequence(args.map(_(bindings)))
 
     def apply(bindings: Map[String, String]) = {
-      (name, args) match {
-        case ("+", _) => parseArgs(bindings).collect { case left::right::Nil => left + right }
-        case ("trim", _) => parseArgs(bindings).collect { case str::Nil => str.trim }
-        case ("slice", str::beg::Nil) => (str(bindings), beg) match {
-          case (Some(str), begExp: IntLiteral) =>
-            Some(str.slice(begExp.value, str.length))
-          case _ => None
-        }
-        case ("slice", str::beg::end::Nil) => (str(bindings), beg, end) match {
-          case (Some(str), begExp: IntLiteral, endExp: IntLiteral) =>
-            Some(str.slice(begExp.value, endExp.value))
-          case _ => None
-        }
+      (name, args, self) match {
+        case ("+", _, None) => parseArgs(bindings).collect { case left::right::Nil => left + right }
+        // TODO: Add method variants of trim and slice?
+        case ("trim", _, None) => parseArgs(bindings).collect { case str::Nil => str.trim }
+        case ("slice", expr::(beg: IntLiteral)::Nil, None) =>
+          expr(bindings).map { str => str.slice(beg.value, str.length) }
+        case ("slice", expr::(beg: IntLiteral)::(end: IntLiteral)::Nil, None) =>
+          expr(bindings).map { str => str.slice(beg.value, end.value) }
+        case ("replace", RegexLiteral(pattern, global, _)::(toExpr: Expr)::Nil, Some(fromExpr)) =>
+          for {
+            from <- fromExpr(bindings);
+            to <- toExpr(bindings)
+          } yield {
+            val matcher = pattern.matcher(from)
+            if (global) matcher.replaceAll(to) else matcher.replaceFirst(to)
+          }
         case _ =>
           None
       }
@@ -136,16 +139,14 @@ package object ast {
   }
 
   object Func {
-    def apply(tokens: List[String], name: Expr): Result[Func] = {
-      (name, tokens) match {
-        case (id: Id, ")"::tail) =>
-          Some(Func(id.name, Nil) -> tail)
-        case (id: Id, head::tail) =>
-          parseArguments(tokens).map { case (args, rest) =>
-            Func(id.name, args) -> rest
-          }
-        case _ => None
-      }
+    def apply(tokens: List[String], name: Expr, self: Option[Expr]): Result[Func] = (name, tokens) match {
+      case (id: Id, ")"::tail) =>
+        Some(Func(id.name, Nil, self) -> tail)
+      case (id: Id, head::tail) =>
+        parseArguments(tokens).map { case (args, rest) =>
+          Func(id.name, args, self) -> rest
+        }
+      case _ => None
     }
 
     def parseArguments(tokens: List[String], args: List[Expr] = Nil): Result[List[Expr]] = {
@@ -174,8 +175,8 @@ package object ast {
     override def toJson(bindings: Map[String, String]) = Some(JNumber(value))
   }
 
-  case class RegexLiteral(regex: Regex, flags: Set[Char])
-      extends Literal(s"/${regex}/${flags.mkString}", None)
+  case class RegexLiteral(regex: Pattern, global: Boolean, flags: String)
+      extends Literal(s"/${regex}/${flags}", None)
 
   object Literal extends Parser[Literal] {
     def apply(tokens: List[String]) = {
@@ -215,11 +216,14 @@ package object ast {
 
     private def regex(tokens: List[String]) = quote("/", tokens) match {
       case Some((Literal(pattern, _), head::tail)) if Id.regex(head).matches =>
-        println("monkey")
-        Some(RegexLiteral(pattern.r, head.toSet) -> tail)
-      case Some((Literal(pattern, _), tail)) =>
-        println("ape")
-        Some(RegexLiteral(pattern.r, Set.empty) -> tail)
+        val flagSet: Set[Char] = head.toSet
+        val flags = 1 |
+          (if (flagSet('i')) Pattern.CASE_INSENSITIVE else 0) |
+          (if (flagSet('m')) Pattern.MULTILINE else 0)
+        val underlying = Pattern.compile(pattern, flags)
+        Some(RegexLiteral(underlying, flagSet('g'), flagSet.mkString) -> tail)
+      case Some((Literal(pattern, _), rest)) =>
+        Some(RegexLiteral(Pattern.compile(pattern), false, "") -> rest)
       case _ => None
     }
 
