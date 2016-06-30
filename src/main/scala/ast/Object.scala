@@ -23,7 +23,7 @@ case class Object(underlying: Map[Expr, Expr]) extends Expr {
 object Object extends Parser[Object] {
   def apply(tokens: List[String]) = tokens match {
     case "{"::"}"::tail => Some(Object(Map[Expr, Expr]()) -> tail)
-    case "{"::tail => parseBody(tokens.tail)
+    case "{"::tail => parseBody(tail)
     case _ => None
   }
 

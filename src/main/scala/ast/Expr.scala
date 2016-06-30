@@ -34,14 +34,8 @@ object Expr extends Parser[Expr] {
     }
   }
 
-
-  def wrapped(tokens: List[String]): Result[Expr] = if (tokens.nonEmpty) {
-    Expr(tokens.tail) match {
-      case Some((expr, rest)) if (tokens.head == "(" && rest.head == ")") =>
-        Some(expr -> rest.tail)
-      case _ => None
-    }
-  } else {
-    None
+  def wrapped(tokens: List[String]): Result[Expr] = (tokens) match {
+    case "("::tail => Expr(tail).collect { case (expr, ")"::rest) => expr -> rest }
+    case _ => None
   }
 }

@@ -8,10 +8,9 @@ object Id extends Parser[Id] {
   private val underlyingRegex = """^[a-zA-Z][a-zA-Z0-9]*$""".r
   def regex(s: String): java.util.regex.Matcher = underlyingRegex.pattern.matcher(s)
 
-  def apply(tokens: List[String]) =
-    if (tokens.nonEmpty && regex(tokens.head).matches && tokens.tail.head != ":") {
-      Some(Id(tokens.head) -> tokens.tail)
-    } else {
-      None
-    }
+  def apply(tokens: List[String]) = tokens match {
+    case head::":"::tail => None
+    case head::tail if regex(head).matches => Some(Id(head) -> tail)
+    case _ => None
+  }
 }

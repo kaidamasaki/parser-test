@@ -22,39 +22,32 @@ case class RegexLiteral(regex: Pattern, global: Boolean, flags: String)
     extends Literal(s"/${regex}/${flags}", None)
 
 object Literal extends Parser[Literal] {
-  def apply(tokens: List[String]) = {
-    if (tokens.isEmpty) {
-      None
-    } else {
-      quote("\"", tokens).
+  def apply(tokens: List[String]) = tokens match {
+    case Nil => None
+    case _ => quote("\"", tokens).
         orElse(quote("'", tokens)).
         orElse(regex(tokens)).
         orElse(int(tokens)).
         orElse(objectKey(tokens))
-    }
   }
 
   def unapply(literal: Literal): Option[(String, Option[String])] = Some((literal.body, literal.delim))
 
   def apply(body: String, delim: Option[String]) = new Literal(body, delim)
 
-  private def objectKey(tokens: List[String]) = {
-    if (Id.regex(tokens.head).matches && tokens.tail.head == ":") {
-      Some(Literal(tokens.head, None) -> tokens.tail)
-    } else {
-      None
-    }
+  private def objectKey(tokens: List[String]) = tokens match {
+    case head::(tail @ (":"::_)) if Id.regex(head).matches => Some(Literal(head, None) -> tail)
+    case _ => None
   }
 
-  private def quote(delim: String, tokens: List[String]) = {
-    val body = tokens.tail.takeWhile(_ != delim)
-    val rest = tokens.tail.dropWhile(_ != delim)
-
-    if (rest.nonEmpty && tokens.head == delim && rest.head == delim) {
-      Some(Literal(body.mkString, Some(rest.head)) -> rest.tail)
-    } else {
-      None
-    }
+  private def quote(delim: String, tokens: List[String]) = tokens match {
+    case `delim`::tail =>
+      val body = tail.takeWhile(_ != delim)
+      tail.dropWhile(_ != delim) match {
+        case `delim`::rest => Some(Literal(body.mkString, Some(delim)) -> rest)
+        case _ => None
+      }
+    case _ => None
   }
 
   private def regex(tokens: List[String]) = quote("/", tokens) match {
@@ -70,11 +63,12 @@ object Literal extends Parser[Literal] {
     case _ => None
   }
 
-  private def int(tokens: List[String]) = {
-    try {
-      Some(IntLiteral(tokens.head.toInt) -> tokens.tail)
+  private def int(tokens: List[String]) = tokens match {
+    case head::tail => try {
+      Some(IntLiteral(head.toInt) -> tail)
     } catch {
       case _: NumberFormatException => None
     }
+    case _ => None
   }
 }

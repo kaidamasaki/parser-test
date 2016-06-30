@@ -20,8 +20,8 @@ object Transform {
       Expr(tokens) match {
         case Some((expr, Nil)) =>
           parseBody(Nil, expr::exprs)
-        case Some((expr, rest)) if rest.head == "," => // TODO: Handle whitespace?
-          parseBody(rest.tail, expr::exprs)
+        case Some((expr, ","::rest)) => // TODO: Handle whitespace?
+          parseBody(rest, expr::exprs)
         case _ => None
       }
     }
