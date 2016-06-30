@@ -11,7 +11,7 @@ case class Func(name: String, args: List[Expr], self: Option[Expr]) extends Expr
     case ("upper", _, None) => parseArgs(bindings).collect { case str::Nil => str.toUpperCase }
     case ("lower", _, None) => parseArgs(bindings).collect { case str::Nil => str.toLowerCase }
     case ("title", _, None) => parseArgs(bindings).collect { case str::Nil =>
-      str.replace('_', ' ').split(' ').map { s => s.head.toUpper + s.tail }.mkString(" ")
+      str.replace('_', ' ').split(' ').map(_.capitalize).mkString(" ")
     }
     case ("toStateCode", _, None) => parseArgs(bindings).collect { case str::Nil => Util.stateCodes(str) }
     case ("slice", expr::(beg: IntLiteral)::Nil, None) =>
