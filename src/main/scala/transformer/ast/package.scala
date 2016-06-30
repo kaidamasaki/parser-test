@@ -6,6 +6,59 @@ import com.rojoma.json.v3.util.JsonUtil
 import com.rojoma.json.v3.ast.{JNumber, JObject, JString, JValue}
 
 package object ast {
+  private val stateCodes = Map(
+    "alabama" -> "AL",
+    "alaska" -> "AK",
+    "arizona" -> "AZ",
+    "arkansas" -> "AR",
+    "california" -> "CA",
+    "colorado" -> "CO",
+    "connecticut" -> "CT",
+    "delaware" -> "DE",
+    "florida" -> "FL",
+    "georgia" -> "GA",
+    "hawaii" -> "HI",
+    "idaho" -> "ID",
+    "illinois" -> "IL",
+    "indiana" -> "IN",
+    "iowa" -> "IA",
+    "kansas" -> "KS",
+    "kentucky" -> "KY",
+    "louisiana" -> "LA",
+    "maine" -> "ME",
+    "maryland" -> "MD",
+    "massachusetts" -> "MA",
+    "michigan" -> "MI",
+    "minnesota" -> "MN",
+    "mississippi" -> "MS",
+    "missouri" -> "MO",
+    "montana" -> "MT",
+    "nebraska" -> "NE",
+    "nevada" -> "NV",
+    "new hampshire" -> "NH",
+    "new jersey" -> "NJ",
+    "new mexico" -> "NM",
+    "new york" -> "NY",
+    "north carolina" -> "NC",
+    "north dakota" -> "ND",
+    "ohio" -> "OH",
+    "oklahoma" -> "OK",
+    "oregon" -> "OR",
+    "pennsylvania" -> "PA",
+    "rhode island" -> "RI",
+    "south carolina" -> "SC",
+    "south dakota" -> "SD",
+    "tennessee" -> "TN",
+    "texas" -> "TX",
+    "utah" -> "UT",
+    "vermont" -> "VT",
+    "virginia" -> "VA",
+    "washington" -> "WA",
+    "west virginia" -> "WV",
+    "wisconsin" -> "WI",
+    "wyoming" -> "WY"
+  )
+
   def sequence[T](list: List[Option[T]]) =
     if (list.forall(_.isDefined)) Some(list.collect { case Some(item) => item }) else None
 
@@ -119,6 +172,12 @@ package object ast {
       case ("+", _, None) => parseArgs(bindings).collect { case left::right::Nil => left + right }
       // TODO: Add method variants of trim and slice?
       case ("trim", _, None) => parseArgs(bindings).collect { case str::Nil => str.trim }
+      case ("upper", _, None) => parseArgs(bindings).collect { case str::Nil => str.toUpperCase }
+      case ("lower", _, None) => parseArgs(bindings).collect { case str::Nil => str.toLowerCase }
+      case ("title", _, None) => parseArgs(bindings).collect { case str::Nil =>
+        str.replace('_', ' ').split(' ').map { s => s.head.toUpper + s.tail }.mkString(" ")
+      }
+      case ("toStateCode", _, None) => parseArgs(bindings).collect { case str::Nil => stateCodes(str) }
       case ("slice", expr::(beg: IntLiteral)::Nil, None) =>
         expr(bindings).map { str => str.slice(beg.value, str.length) }
       case ("slice", expr::(beg: IntLiteral)::(end: IntLiteral)::Nil, None) =>
