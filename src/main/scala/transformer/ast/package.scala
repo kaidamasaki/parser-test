@@ -65,7 +65,7 @@ package object ast {
       println(s"Expr: $expr")
       println(s"parseFunc: $ret")
 
-      ret
+      ret.orElse(expr)
     }
 
     def concat(tokens: List[String], left: Expr): Result[Func] =
@@ -175,7 +175,7 @@ package object ast {
   }
 
   case class RegexLiteral(regex: Regex, flags: Set[Char])
-      extends Literal(s"/${regex}/${flags.mkString}", Some("/"))
+      extends Literal(s"/${regex}/${flags.mkString}", None)
 
   object Literal extends Parser[Literal] {
     def apply(tokens: List[String]) = {
@@ -214,8 +214,12 @@ package object ast {
     }
 
     private def regex(tokens: List[String]) = quote("/", tokens) match {
-      case Some((Literal(pattern, _), head::tail)) => Some(RegexLiteral(pattern.r, head.toSet) -> tail)
-      case Some((Literal(pattern, _), Nil)) => Some(RegexLiteral(pattern.r, Set.empty) -> Nil)
+      case Some((Literal(pattern, _), head::tail)) if Id.regex(head).matches =>
+        println("monkey")
+        Some(RegexLiteral(pattern.r, head.toSet) -> tail)
+      case Some((Literal(pattern, _), tail)) =>
+        println("ape")
+        Some(RegexLiteral(pattern.r, Set.empty) -> tail)
       case _ => None
     }
 
