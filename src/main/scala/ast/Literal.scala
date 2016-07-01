@@ -41,12 +41,10 @@ object Literal extends Parser[Literal] {
   }
 
   private def quote(delim: String)(tokens: List[String]) = tokens match {
-    case `delim`::tail =>
-      val body = tail.takeWhile(_ != delim)
-      tail.dropWhile(_ != delim) match {
-        case `delim`::rest => Right(Literal(body.mkString, Some(delim)) -> rest)
-        case _ => Left(s"""Unexpected end of transform while looking for matching "$delim"!""")
-      }
+    case lit::rest if lit.startsWith(delim) && lit.endsWith(delim) =>
+      val body = lit.substring(1, lit.length - 1)
+
+      Right(Literal(body, Some(delim)) -> rest)
     // TODO: Consoldate the language around these.  Do we need to localize errors?  Did we previously?
     case _ => Left("""Unexpected end of transform!""")
   }

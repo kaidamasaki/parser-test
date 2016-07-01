@@ -1,6 +1,8 @@
 package com.socrata.ice.importer
 package ast
 
+import scala.annotation.tailrec
+
 case class Func(name: String, args: List[Expr], self: Option[Expr]) extends Expr {
   def parseArgs(bindings: Map[String, String]) = Util.sequence(args.map(_(bindings)))
 
@@ -43,19 +45,21 @@ object Func {
         Func(id.name, args, self) -> rest
       }
     case (id: Id, Nil) => Left("Unexpected end of transform!")
-    case _ => Left("Unexpected error!")
+    case _ => Util.unexpected
   }
 
+  @tailrec
   def parseArguments(tokens: List[String], args: List[Expr] = Nil): Result[List[Expr]] = {
-    Expr(tokens).right.flatMap {
-      case (expr, ","::tail) =>
+    Expr(tokens) match {
+      case Right((expr, ","::tail)) =>
         parseArguments(tail, expr::args)
-      case (expr, ")"::tail) =>
+      case Right((expr, ")"::tail)) =>
         Right((expr::args).reverse -> tail)
-      case (expr, head::tail) =>
+      case Right((expr, head::tail)) =>
         Left(s"""Invalid argument list: expected "," or ")" got "$head"!""")
-      case (expr, Nil) =>
+      case Right((expr, Nil)) =>
         Left("""Unexpected end of transform while looking for matching ")"!""")
+      case Left(err) => Left(err)
     }
   }
 }

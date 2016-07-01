@@ -1,8 +1,14 @@
 package com.socrata.ice.importer
 
+import scala.reflect.ClassTag
+
 import ast.{Parser, Result}
 
 object Util {
+  private[importer] def unexpected[T](implicit tag: ClassTag[T]): Result[T] = {
+    Left(s"Unexpected error whlie parsing ${tag.runtimeClass.getSimpleName}!")
+  }
+
   private[importer] val stateCodes = Map(
     "alabama" -> "AL",
     "alaska" -> "AK",
@@ -59,11 +65,12 @@ object Util {
   private[importer] def sequence[T](list: List[Option[T]]) =
     if (list.forall(_.isDefined)) Some(list.collect { case Some(item) => item }) else None
 
-  private[importer] def chain[T](tokens: List[String])(parsers: Parser[T]*): Result[T] = parsers.toList match {
-    case head::tail => head(tokens) match {
-      case expr @ Right(_) => expr
-      case Left(_) => chain(tokens)(tail: _*)
+  private[importer] def chain[T](in: List[String])(parsers: Parser[T]*)(implicit tag: ClassTag[T]): Result[T] =
+    parsers.toList match {
+      case head::tail => head(in) match {
+        case expr @ Right(_) => expr
+        case Left(_) => chain(in)(tail: _*)
+      }
+      case Nil => unexpected[T]
     }
-    case Nil => Left("Unexpected error!")
-  }
 }

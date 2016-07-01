@@ -1,5 +1,7 @@
 package com.socrata.ice.importer.ast
 
+import scala.annotation.tailrec
+
 import com.rojoma.json.v3.util.JsonUtil
 import com.rojoma.json.v3.ast.{JObject, JValue}
 
@@ -25,6 +27,7 @@ object Object extends Parser[Object] {
     case _ => Left("Malformed object!")
   }
 
+  @tailrec
   def parseBody(tokens: List[String],
                 lastKey: Option[Expr] = None,
                 pairs: List[(Expr, Expr)] = Nil): Result[Object] = (Expr(tokens), lastKey) match {
