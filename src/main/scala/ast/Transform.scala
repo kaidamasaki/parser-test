@@ -13,24 +13,26 @@ case class Transform(expressions: List[Expr]) {
 object Transform {
   private val regex = """^\[(.*)\]$""".r
 
-  def parseBody(tokens: List[String], exprs: List[Expr] = Nil): Option[List[Expr]] = {
+  def parseBody(tokens: List[String], exprs: List[Expr] = Nil): Either[String, List[Expr]] = {
     if (tokens == Nil) {
-      Some(exprs.reverse)
+      Right(exprs.reverse)
     } else {
       Expr(tokens) match {
-        case Some((expr, Nil)) =>
+        case Right((expr, Nil)) =>
           parseBody(Nil, expr::exprs)
-        case Some((expr, ","::rest)) => // TODO: Handle whitespace?
+        case Right((expr, ","::rest)) =>
           parseBody(rest, expr::exprs)
-        case _ => None
+        case Right((expr, _)) => Left("Missing comma!")
+        case Left(err) => Left(err)
+        case _ => Left("Unexpected error!")
       }
     }
   }
 
-  def apply(definition: String): Option[Transform] = definition match {
+  def apply(definition: String): Either[String, Transform] = definition match {
     case regex(inner) =>
       val tokens = inner.split("((?<=[^a-zA-Z0-9])|(?=[^a-zA-Z0-9]))").toList
-      parseBody(tokens).map(Transform(_))
-    case _ => None
+      parseBody(tokens).right.map(Transform(_))
+    case _ => Left("""Missing opening "[" or closing "]"!""")
   }
 }

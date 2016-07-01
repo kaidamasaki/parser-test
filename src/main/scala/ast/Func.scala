@@ -29,27 +29,33 @@ case class Func(name: String, args: List[Expr], self: Option[Expr]) extends Expr
     case ("stringify", (obj:Object)::Nil, Some(Id("JSON"))) => obj(bindings)
     case _ => None
   }
+
+  // case class Func(name: String, args: List[Expr], self: Option[Expr]) extends Expr {
+  override def toString = s"""Func(${self.map{_ + "."}.getOrElse("")}${name}(${args.mkString(",")}))"""
 }
 
 object Func {
   def apply(tokens: List[String], name: Expr, self: Option[Expr]): Result[Func] = (name, tokens) match {
     case (id: Id, ")"::tail) =>
-      Some(Func(id.name, Nil, self) -> tail)
+      Right(Func(id.name, Nil, self) -> tail)
     case (id: Id, head::tail) =>
-      parseArguments(tokens).map { case (args, rest) =>
+      parseArguments(tokens).right.map { case (args, rest) =>
         Func(id.name, args, self) -> rest
       }
-    case _ => None
+    case (id: Id, Nil) => Left("Unexpected end of transform!")
+    case _ => Left("Unexpected error!")
   }
 
   def parseArguments(tokens: List[String], args: List[Expr] = Nil): Result[List[Expr]] = {
-    Expr(tokens).flatMap {
+    Expr(tokens).right.flatMap {
       case (expr, ","::tail) =>
         parseArguments(tail, expr::args)
       case (expr, ")"::tail) =>
-        Some((expr::args).reverse -> tail)
-      case _ =>
-        None
+        Right((expr::args).reverse -> tail)
+      case (expr, head::tail) =>
+        Left(s"""Invalid argument list: expected "," or ")" got "$head"!""")
+      case (expr, Nil) =>
+        Left("""Unexpected end of transform while looking for matching ")"!""")
     }
   }
 }

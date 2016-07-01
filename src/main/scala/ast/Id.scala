@@ -9,8 +9,8 @@ object Id extends Parser[Id] {
   def regex(s: String): java.util.regex.Matcher = underlyingRegex.pattern.matcher(s)
 
   def apply(tokens: List[String]) = tokens match {
-    case head::":"::tail => None
-    case head::tail if regex(head).matches => Some(Id(head) -> tail)
-    case _ => None
+    case head::":"::tail => Left("""Unexpected ":"!""")
+    case head::tail if regex(head).matches => Right(Id(head) -> tail)
+    case _ => Left("""Invalid identifier!""")
   }
 }

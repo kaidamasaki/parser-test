@@ -19,8 +19,8 @@ object Main {
     val tree = ast.Transform(spec)
     println(tree)
     tree match {
-      case Some(parsed) => println(parsed(row))
-      case None => println("Failed to parse!")
+      case Right(parsed) => println(parsed(row))
+      case Left(err) => println(err)
     }
   }
 }

@@ -1,4 +1,5 @@
-package com.socrata.ice.importer.ast
+package com.socrata.ice.importer
+package ast
 
 import com.rojoma.json.v3.ast.{JString, JValue}
 
@@ -9,33 +10,30 @@ trait Expr {
 
 object Expr extends Parser[Expr] {
   def apply(tokens: List[String]): Result[Expr] = {
-    val expr = Id(tokens).
-      orElse(Literal(tokens)).
-      orElse(wrapped(tokens)).
-      orElse(Object(tokens))
+    val expr = Util.chain(tokens)(Id, Literal, wrapped, Object)
 
-    println(s"Expr: $expr")
     parseFunc(expr, None)
   }
 
   def concat(tokens: List[String], left: Expr): Result[Func] =
-    Expr(tokens).map { case (right, rest) => Func("+", List(left, right), None) -> rest }
+    Expr(tokens).right.map { case (right, rest) => Func("+", List(left, right), None) -> rest }
 
-  def parseFunc(expr: Result[Expr], self: Option[Expr]): Result[Expr] = {
-    println(s"parseFunc: $expr / $self")
-
-    (expr, self) match {
-      case (Some((next, Nil)), _) => Some(next, Nil)
-      case (Some((left, "+" :: rest)), _) => parseFunc(concat(rest, left), self)
-      case (Some((name, "(" :: rest)), _) => parseFunc(Func(rest, name, self), None)
-      case (Some((newSelf, "." :: rest)), None) => parseFunc(Id(rest), Some(newSelf))
-      case (Some(result), None) => Some(result)
-      case _ => None
-    }
+  def parseFunc(expr: Result[Expr], self: Option[Expr]): Result[Expr] = (expr, self) match {
+    case (Right((next, Nil)), _) => Right((next, Nil))
+    case (Right((left, "+" :: rest)), _) => parseFunc(concat(rest, left), self)
+    case (Right((name, "(" :: rest)), _) => parseFunc(Func(rest, name, self), None)
+    case (Right((newSelf, "." :: rest)), None) => parseFunc(Id(rest), Some(newSelf))
+    case (Right(result), None) => Right(result)
+    case (Left(err), _) => Left(err)
+    case _ => Left("Unexpected error!")
   }
 
   def wrapped(tokens: List[String]): Result[Expr] = (tokens) match {
-    case "("::tail => Expr(tail).collect { case (expr, ")"::rest) => expr -> rest }
-    case _ => None
+    case "("::tail => Expr(tail).right.flatMap {
+      case (expr, ")"::rest) => Right(expr -> rest)
+      case (expr, next::rest) => Left(s"""Expected ")" but got "$next"!""")
+      case (expr, Nil) => Left(s"""Unexpected end of transform while looking for ")"!""")
+    }
+    case _ => Left("Unexpected error!")
   }
 }

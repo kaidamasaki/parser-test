@@ -11,9 +11,7 @@ case class Object(underlying: Map[Expr, Expr]) extends Expr {
       underlying.collect { case (keyExp, valExp) => keyExp(bindings) -> valExp.toJson(bindings) }
 
     if (evaluated.forall { case (k, v) => k.isDefined && v.isDefined }) {
-      val obj = evaluated.collect { case (Some(key), Some(value)) => key -> value }
-
-      Some(JObject(obj))
+      Some(JObject(evaluated.collect { case (Some(key), Some(value)) => key -> value }))
     } else {
       None
     }
@@ -22,23 +20,23 @@ case class Object(underlying: Map[Expr, Expr]) extends Expr {
 
 object Object extends Parser[Object] {
   def apply(tokens: List[String]) = tokens match {
-    case "{"::"}"::tail => Some(Object(Map[Expr, Expr]()) -> tail)
+    case "{"::"}"::tail => Right(Object(Map[Expr, Expr]()) -> tail)
     case "{"::tail => parseBody(tail)
-    case _ => None
+    case _ => Left("Malformed object!")
   }
 
   def parseBody(tokens: List[String],
                 lastKey: Option[Expr] = None,
-                pairs: List[(Expr, Expr)] = Nil): Result[Object] = Expr(tokens) match {
-    case Some((key, ":"::tail)) =>
-      parseBody(tail, Some(key), pairs)
-    case Some((value, ","::tail)) => lastKey.flatMap { k =>
-      parseBody(tail, None, (k -> value)::pairs)
-    }
-    case Some((value, "}"::tail)) =>
-      val obj: Option[Map[Expr, Expr]] = lastKey.map { k => ((k -> value)::pairs).reverse.toMap }
-
-      obj.map { o => Object(o) -> tail }
-    case _ => None
+                pairs: List[(Expr, Expr)] = Nil): Result[Object] = (Expr(tokens), lastKey) match {
+    case (Right((key, ":"::tail)), None) => parseBody(tail, Some(key), pairs)
+    case (Right((value, ","::tail)), Some(key)) => parseBody(tail, None, (key -> value)::pairs)
+    case (Right((value, "}"::tail)), Some(key)) => Right(Object(((key -> value)::pairs).reverse.toMap) -> tail)
+    // Error handling!
+    case (Right((key, ":"::tail)), Some(_)) => Left(s"""Malformed object: expected value got "$key:"!""")
+    case (Right((value, ","::tail)), None) => Left(s"""Malformed object: expected KEY : VALUE got "$value,"!""")
+    case (Right((value, "}"::tail)), None) => Left(s"""Malformed object: expected KEY: VALUE got "$value}"!""")
+    case (Right((expr, unexp::tail)), _) => Left(s"""Malformed object: unexpected character "$unexp"!""")
+    case (Right((expr, Nil)), _) => Left(s"""Malformed object: unexpected end of transform!""")
+    case (Left(err), _) => Left(err)
   }
 }

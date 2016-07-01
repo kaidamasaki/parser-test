@@ -1,5 +1,7 @@
 package com.socrata.ice.importer
 
+import ast.{Parser, Result}
+
 object Util {
   private[importer] val stateCodes = Map(
     "alabama" -> "AL",
@@ -56,4 +58,12 @@ object Util {
 
   private[importer] def sequence[T](list: List[Option[T]]) =
     if (list.forall(_.isDefined)) Some(list.collect { case Some(item) => item }) else None
+
+  private[importer] def chain[T](tokens: List[String])(parsers: Parser[T]*): Result[T] = parsers.toList match {
+    case head::tail => head(tokens) match {
+      case expr @ Right(_) => expr
+      case Left(_) => chain(tokens)(tail: _*)
+    }
+    case Nil => Left("Unexpected error!")
+  }
 }
