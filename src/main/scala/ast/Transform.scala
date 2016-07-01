@@ -72,6 +72,7 @@ object Transform {
                     tokens: List[String] = Nil): Either[String, List[String]] = input match {
     case ']'::Nil => Right(tokens.reverse)
     case ']'::_ => Left("""Unexpected "]"!""")
+    case (' '|'\t')::rest => tokenizeInner(rest, tokens)
     case head::tail if alnum(head) => tokenizeAlnum(input) match {
       case (token, rest) => tokenizeInner(rest, token::tokens)
     }
