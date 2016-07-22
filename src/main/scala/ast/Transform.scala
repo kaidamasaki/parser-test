@@ -3,6 +3,8 @@ package ast
 
 import scala.annotation.tailrec
 
+import token.{Symbol, Token}
+
 case class Transform(expressions: List[Expr]) {
   def apply(row: List[String]): Option[List[String]] = {
     val bindings = row.zipWithIndex.map { case (cell, idx) => s"col${idx + 1}" -> cell }.toMap
@@ -13,8 +15,8 @@ case class Transform(expressions: List[Expr]) {
 }
 
 object Transform {
-  def apply(definition: String): Either[String, Transform] = definition.toList match {
-    case '['::inner => for {
+  def apply(definition: String): Either[String, Transform] = symbolize(definition) match {
+    case Symbol('[')::inner => for {
       tokens <- tokenizeInner(inner).right
       body <- parseBody(tokens).right
     } yield body match {
@@ -25,15 +27,15 @@ object Transform {
     case Nil => Left("""Unexpected end of transform while looking for "["!""")
   }
 
-  def parseBody(tokens: List[String], exprs: List[Expr] = Nil): Result[Transform] = {
+  def symbolize(definition: String): List[Symbol] = definition.zipWithIndex.map(Symbol.fromTuple).toList
+
+  def parseBody(tokens: List[Token], exprs: List[Expr] = Nil): Result[Transform] = {
     if (tokens == Nil) {
       Right(Transform(exprs.reverse) -> Nil)
     } else {
       Expr(tokens) match {
-        case Right((expr, Nil)) =>
-          parseBody(Nil, expr::exprs)
-        case Right((expr, ","::rest)) =>
-          parseBody(rest, expr::exprs)
+        case Right((expr, Nil)) => parseBody(Nil, expr::exprs)
+        case Right((expr, Token(",")::rest)) => parseBody(rest, expr::exprs)
         case Right((expr, _)) => Left("Missing comma!")
         case Left(err) => Left(err)
         case _ => Util.unexpected
@@ -41,6 +43,7 @@ object Transform {
     }
   }
 
+  private val delims =  Set('"', '\'', '/')
   private val alnum = Set.empty ++ ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')
   private val escapes = Map('n' -> '\n',
                             't' -> '\t',
@@ -49,38 +52,38 @@ object Transform {
                             'r' -> '\r')
 
   @tailrec
-  def tokenizeAlnum(input: List[Char],
-                    token: List[Char] = Nil): (String, List[Char]) = input match {
-    case head::tail if alnum(head) => tokenizeAlnum(tail, head::token)
-    case rest => token.reverse.mkString -> rest
+  def tokenizeAlnum(input: List[Symbol],
+                    token: List[Symbol] = Nil): (Token, List[Symbol]) = input match {
+    case head::tail if alnum(head.char) => tokenizeAlnum(tail, head::token)
+    case rest => Token.fromSymbols(token.reverse) -> rest
   }
 
   @tailrec
-  def tokenizeString(input: List[Char],
+  def tokenizeString(input: List[Symbol],
                      delim: Char,
-                     token: List[Char]): Either[String, (String, List[Char])] = input match {
-    case `delim`::rest => Right((delim::token).reverse.mkString -> rest)
-    case '\\'::`delim`::rest => tokenizeString(rest, delim, delim::token)
-    case '\\'::c::rest if escapes.keySet(c) => tokenizeString(rest, delim, escapes(c)::token)
-    case '\\'::c::rest => tokenizeString(rest, delim, c::token)
-    case c::rest => tokenizeString(rest, delim, c::token)
+                     token: List[Symbol]): Either[String, (Token, List[Symbol])] = input match {
+    case head::rest if head.char == delim => Right(Token.fromSymbols((head::token).reverse) -> rest)
+    case Symbol('\\')::(s @ Symbol(`delim`))::rest => tokenizeString(rest, delim, s::token)
+    case Symbol('\\')::s::rest if escapes.keySet(s.char) => tokenizeString(rest, delim, s(escapes)::token)
+    case Symbol('\\')::s::rest => tokenizeString(rest, delim, s::token)
+    case s::rest => tokenizeString(rest, delim, s::token)
     case Nil => Left(s"""Unexpected end of transform while looking for matching "$delim"!""")
   }
 
   @tailrec
-  def tokenizeInner(input: List[Char],
-                    tokens: List[String] = Nil): Either[String, List[String]] = input match {
-    case ']'::Nil => Right(tokens.reverse)
-    case ']'::_ => Left("""Unexpected "]"!""")
-    case (' '|'\t')::rest => tokenizeInner(rest, tokens)
-    case head::tail if alnum(head) => tokenizeAlnum(input) match {
+  def tokenizeInner(input: List[Symbol],
+                    tokens: List[Token] = Nil): Either[String, List[Token]] = input match {
+    case Symbol(']')::Nil => Right(tokens.reverse)
+    case Symbol(']')::_ => Left("""Unexpected "]"!""")
+    case (Symbol(' ')|Symbol('\t'))::rest => tokenizeInner(rest, tokens)
+    case head::tail if alnum(head.char) => tokenizeAlnum(input) match {
       case (token, rest) => tokenizeInner(rest, token::tokens)
     }
-    case (delim @ ('"'|'\''|'/'))::tail => tokenizeString(tail, delim, delim::Nil) match {
+    case delim::tail if delims(delim.char) => tokenizeString(tail, delim.char, delim::Nil) match {
       case Right((token, rest)) => tokenizeInner(rest, token::tokens)
       case Left(err) => Left(err)
     }
-    case head::tail => tokenizeInner(tail, head.toString::tokens)
+    case head::tail => tokenizeInner(tail, Token(head)::tokens)
     case Nil => Left("""Unexpected end of transform while looking for "]"!""")
   }
 }

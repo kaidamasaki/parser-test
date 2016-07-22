@@ -3,6 +3,7 @@ package com.socrata.ice.importer
 import scala.reflect.ClassTag
 
 import ast.{Parser, Result}
+import token.Token
 
 object Util {
   private[importer] def unexpected[T](implicit tag: ClassTag[T]): Result[T] = {
@@ -65,7 +66,7 @@ object Util {
   private[importer] def sequence[T](list: List[Option[T]]) =
     if (list.forall(_.isDefined)) Some(list.collect { case Some(item) => item }) else None
 
-  private[importer] def chain[T](in: List[String])(parsers: Parser[T]*)(implicit tag: ClassTag[T]): Result[T] =
+  private[importer] def chain[T](in: List[Token])(parsers: Parser[T]*)(implicit tag: ClassTag[T]): Result[T] =
     parsers.toList match {
       case head::tail => head(in) match {
         case expr @ Right(_) => expr

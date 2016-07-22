@@ -3,7 +3,9 @@ package ast
 
 import scala.annotation.tailrec
 
-case class Func(name: String, args: List[Expr], self: Option[Expr]) extends Expr {
+import token.Token
+
+case class Func(name: String, args: List[Expr], self: Option[Expr], idx: Int) extends Expr {
   def parseArgs(bindings: Map[String, String]) = Util.sequence(args.map(_(bindings)))
 
   def apply(bindings: Map[String, String]) = (name, args, self) match {
@@ -37,23 +39,23 @@ case class Func(name: String, args: List[Expr], self: Option[Expr]) extends Expr
 }
 
 object Func {
-  def apply(tokens: List[String], name: Expr, self: Option[Expr]): Result[Func] = (name, tokens) match {
-    case (id: Id, ")"::tail) =>
-      Right(Func(id.name, Nil, self) -> tail)
+  def apply(tokens: List[Token], name: Expr, self: Option[Expr]): Result[Func] = (name, tokens) match {
+    case (id: Id, Token(")")::tail) =>
+      Right(Func(id.name, Nil, self, id.idx) -> tail)
     case (id: Id, head::tail) =>
       parseArguments(tokens).right.map { case (args, rest) =>
-        Func(id.name, args, self) -> rest
+        Func(id.name, args, self, id.idx) -> rest
       }
     case (id: Id, Nil) => Left("Unexpected end of transform!")
     case _ => Util.unexpected
   }
 
   @tailrec
-  def parseArguments(tokens: List[String], args: List[Expr] = Nil): Result[List[Expr]] = {
+  def parseArguments(tokens: List[Token], args: List[Expr] = Nil): Result[List[Expr]] = {
     Expr(tokens) match {
-      case Right((expr, ","::tail)) =>
+      case Right((expr, Token(",")::tail)) =>
         parseArguments(tail, expr::args)
-      case Right((expr, ")"::tail)) =>
+      case Right((expr, Token(")")::tail)) =>
         Right((expr::args).reverse -> tail)
       case Right((expr, head::tail)) =>
         Left(s"""Invalid argument list: expected "," or ")" got "$head"!""")

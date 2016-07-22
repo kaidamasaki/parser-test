@@ -5,30 +5,31 @@ import scala.annotation.tailrec
 
 import com.rojoma.json.v3.ast.{JString, JValue}
 
+import token.Token
+
 trait Expr {
   def apply(bindings: Map[String,String]): Option[String]
   def toJson(bindings: Map[String, String]): Option[JValue] = apply(bindings).map(JString)
+  def idx: Int
 }
 
 object Expr extends Parser[Expr] {
-  def apply(tokens: List[String]): Result[Expr] = {
+  def apply(tokens: List[Token]): Result[Expr] = {
     val expr = Util.chain(tokens)(Id, Literal, wrapped, Object)
 
-    println(s"Expr: $expr / $tokens")
     parseFunc(expr, None)
   }
 
-  def concat(tokens: List[String], left: Expr): Result[Func] =
-    Expr(tokens).right.map { case (right, rest) => Func("+", List(left, right), None) -> rest }
+  def concat(tokens: List[Token], left: Expr, idx: Int): Result[Func] =
+    Expr(tokens).right.map { case (right, rest) => Func("+", List(left, right), None, idx) -> rest }
 
   @tailrec
   def parseFunc(expr: Result[Expr], self: Option[Expr]): Result[Expr] = {
-    println(s"parseFunc: $expr / $self")
     (expr, self) match {
       case (Right((next, Nil)), _) => Right((next, Nil))
-      case (Right((left, "+" :: rest)), _) => parseFunc(concat(rest, left), self)
-      case (Right((name, "(" :: rest)), _) => parseFunc(Func(rest, name, self), None)
-      case (Right((newSelf, "." :: rest)), None) => parseFunc(Id(rest), Some(newSelf))
+      case (Right((left, t::rest)), _) if t.body == "+" => parseFunc(concat(rest, left, t.idx), self)
+      case (Right((name, Token("(")::rest)), _) => parseFunc(Func(rest, name, self), None)
+      case (Right((newSelf, t::rest)), None) if t.body == "." => parseFunc(Id(rest), Some(newSelf))
       case (Right(result), None) => Right(result)
       case (Left(err), _) => Left(err)
       case _ =>
@@ -36,14 +37,13 @@ object Expr extends Parser[Expr] {
     }
   }
 
-  def wrapped(tokens: List[String]): Result[Expr] = (tokens) match {
-    case "("::tail => Expr(tail).right.flatMap {
-      case (expr, ")"::rest) => Right(expr -> rest)
+  def wrapped(tokens: List[Token]): Result[Expr] = (tokens) match {
+    case Token("(")::tail => Expr(tail).right.flatMap {
+      case (expr, Token(")")::rest) => Right(expr -> rest)
       case (expr, next::rest) => Left(s"""Expected ")" but got "$next"!""")
       case (expr, Nil) => Left(s"""Unexpected end of transform while looking for ")"!""")
     }
     case _ =>
-      println("wrapped")
       Util.unexpected
   }
 }
