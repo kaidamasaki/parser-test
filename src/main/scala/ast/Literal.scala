@@ -10,7 +10,8 @@ import token.Token
 class Literal(val body: String, val delim: Option[String], val idx: Int) extends Expr {
   def apply(bindings: Map[String, String]) = Right(body)
 
-  lazy val endIdx = idx + body.length + 2 * delim.getOrElse("").length
+  override def src = s"""${delim.getOrElse("")}${body}${delim.getOrElse("")}"""
+  override def endIdx = idx + src.length
 
   override def toString = {
     val inner = delim.map { d => s"${d}${body}${d}" }.getOrElse(body)

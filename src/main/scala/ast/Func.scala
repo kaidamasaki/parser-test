@@ -7,7 +7,7 @@ import token.Token
 import Util.SuccessEither
 
 case class Func(name: String, args: List[Expr], self: Option[Expr], idx: Int) extends Expr {
-  lazy val endIdx = (args.map(_.endIdx) :+ (idx + name.length)).reduceLeft(_ max _) + 1
+  override def endIdx = (args.map(_.endIdx) :+ (idx + name.length)).reduceLeft(_ max _) + 1
 
   def parseArgs(bindings: Map[String, String]) = Util.sequence(args.map(_(bindings)))
 
@@ -39,6 +39,9 @@ case class Func(name: String, args: List[Expr], self: Option[Expr], idx: Int) ex
 
   // case class Func(name: String, args: List[Expr], self: Option[Expr]) extends Expr {
   override def toString = s"""Func(${self.map{_ + "."}.getOrElse("")}${name}(${args.mkString(",")}))"""
+
+  private def selfSrc = self.map { s => s.src + "." }.getOrElse("")
+  override def src = s"""${selfSrc}${name}(args.map(_.src).mkString(",")"""
 }
 
 object Func {

@@ -4,11 +4,13 @@ package ast
 import scala.annotation.tailrec
 
 import com.rojoma.json.v3.util.JsonUtil
-import com.rojoma.json.v3.ast.{JObject, JValue}
+import com.rojoma.json.v3.ast.{JObject, JString, JValue}
 
 import token.Token
 
 case class Object(underlying: Map[Expr, Expr])(val idx: Int, val endIdx: Int) extends Expr {
+  override def src = JObject(underlying.map { case (k, v) => k.src -> JString(v.src) }).toString
+
   def apply(bindings: Map[String, String]) = toJson(bindings).right.map(JsonUtil.renderJson(_))
 
   override def toJson(bindings: Map[String, String]) = {

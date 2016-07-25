@@ -12,7 +12,7 @@ trait Expr {
   def toJson(bindings: Map[String, String]): Either[Error, JValue] = apply(bindings).right.map(JString)
   def idx: Int
   def endIdx: Int
-  def src: String = toString // TODO: make useful for the user!
+  def src: String
 }
 
 object Expr extends Parser[Expr] {

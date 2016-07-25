@@ -4,7 +4,8 @@ package ast
 import token.Token
 
 case class Id(name: String)(val idx: Int) extends Expr {
-  val endIdx = idx + name.length
+  override def endIdx = idx + name.length
+  override def src = name
 
   def apply(bindings: Map[String, String]) = Right(bindings.getOrElse(name, ""))
 }
