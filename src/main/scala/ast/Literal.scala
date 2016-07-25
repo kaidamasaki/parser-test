@@ -10,6 +10,8 @@ import token.Token
 class Literal(val body: String, val delim: Option[String], val idx: Int) extends Expr {
   def apply(bindings: Map[String, String]) = Some(body)
 
+  lazy val endIdx = idx + body.length + 2 * delim.getOrElse("").length
+
   override def toString = {
     val inner = delim.map { d => s"${d}${body}${d}" }.getOrElse(body)
 
@@ -31,28 +33,28 @@ object Literal extends Parser[Literal] {
 
   // Parse
   def apply(tokens: List[Token]) = tokens match {
-    case Nil => Left("Invalid literal!")
+    case Nil => Util.unexpectedEnd
     case _ => Util.chain(tokens)(quote("\""), quote("'"), regex, int, objectKey)
   }
 
-  private def objectKey(tokens: List[Token]) = tokens match {
+  private def objectKey(tokens: List[Token]): Result[Literal] = tokens match {
     case head::(tail @ (Token(":")::_)) if Id.regex(head.body).matches =>
       Right(Literal(head.body, None, head.idx) -> tail)
-    case head::(tail @ (Token(":")::_)) => Left(s"""Invalid identifier "$head"!""")
-    case head::tail => Left("""Missing ":"!""")
-    case Nil => Left("Unexpected end of transform!")
+    case head::(tail @ (Token(":")::_)) => Left(s"""Invalid identifier "${head.body}"!""" -> head.idx)
+    case head::tail => Left("""Missing ":"!""" -> head.endIdx)
+    case Nil => Util.unexpectedEnd
   }
 
-  private def quote(delim: String)(tokens: List[Token]) = tokens match {
+  private def quote(delim: String)(tokens: List[Token]): Result[Literal] = tokens match {
     case lit::rest if lit.body.startsWith(delim) && lit.body.endsWith(delim) =>
       val body = lit.body.substring(1, lit.body.length - 1)
 
       Right(Literal(body, Some(delim), lit.idx) -> rest)
     // TODO: Consoldate the language around these.  Do we need to localize errors?  Did we previously?
-    case _ => Left("""Unexpected end of transform!""")
+    case _ => Util.unexpectedEnd
   }
 
-  private def regex(tokens: List[Token]) = quote("/")(tokens) match {
+  private def regex(tokens: List[Token]): Result[Literal] = quote("/")(tokens) match {
     case Right((Literal(pattern, _), head::tail)) if Id.regex(head.body).matches =>
       val flagSet: Set[Char] = head.body.toSet
       val flags = 1 |
@@ -65,12 +67,12 @@ object Literal extends Parser[Literal] {
     case err @ Left(_)  => err
   }
 
-  private def int(tokens: List[Token]) = tokens match {
+  private def int(tokens: List[Token]): Result[Literal] = tokens match {
     case head::tail => try {
       Right(IntLiteral(head.body.toInt)(head.idx) -> tail)
     } catch {
-      case _: NumberFormatException => Left(s"""Invalid number: "$head"!""")
+      case _: NumberFormatException => Left(s"""Invalid number: "${head.body}"!""" -> head.idx)
     }
-    case _ => Left("Unexpected end of file!")
+    case _ => Util.unexpectedEnd
   }
 }

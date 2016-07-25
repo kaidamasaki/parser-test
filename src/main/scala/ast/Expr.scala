@@ -11,6 +11,8 @@ trait Expr {
   def apply(bindings: Map[String,String]): Option[String]
   def toJson(bindings: Map[String, String]): Option[JValue] = apply(bindings).map(JString)
   def idx: Int
+  def endIdx: Int
+  def src: String = toString // TODO: make useful for the user!
 }
 
 object Expr extends Parser[Expr] {
@@ -32,18 +34,16 @@ object Expr extends Parser[Expr] {
       case (Right((newSelf, t::rest)), None) if t.body == "." => parseFunc(Id(rest), Some(newSelf))
       case (Right(result), None) => Right(result)
       case (Left(err), _) => Left(err)
-      case _ =>
-        Util.unexpected
+      case (Right((expr, _)), _) => Util.unexpected(expr.idx)
     }
   }
 
   def wrapped(tokens: List[Token]): Result[Expr] = (tokens) match {
     case Token("(")::tail => Expr(tail).right.flatMap {
       case (expr, Token(")")::rest) => Right(expr -> rest)
-      case (expr, next::rest) => Left(s"""Expected ")" but got "$next"!""")
-      case (expr, Nil) => Left(s"""Unexpected end of transform while looking for ")"!""")
+      case (expr, next::rest) => Left(s"""Expected ")" but got "${next.body}"!""" -> next.idx)
+      case (expr, Nil) => Left(s"""Unexpected end of transform while looking for ")"!""" -> expr.endIdx)
     }
-    case _ =>
-      Util.unexpected
+    case _ => Util.unexpectedEnd
   }
 }

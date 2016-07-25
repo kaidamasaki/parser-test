@@ -6,6 +6,8 @@ import scala.annotation.tailrec
 import token.Token
 
 case class Func(name: String, args: List[Expr], self: Option[Expr], idx: Int) extends Expr {
+  lazy val endIdx = (args.map(_.endIdx) :+ (idx + name.length)).reduceLeft(_ max _) + 1
+
   def parseArgs(bindings: Map[String, String]) = Util.sequence(args.map(_(bindings)))
 
   def apply(bindings: Map[String, String]) = (name, args, self) match {
@@ -46,8 +48,7 @@ object Func {
       parseArguments(tokens).right.map { case (args, rest) =>
         Func(id.name, args, self, id.idx) -> rest
       }
-    case (id: Id, Nil) => Left("Unexpected end of transform!")
-    case _ => Util.unexpected
+    case _ => Util.unexpectedEnd
   }
 
   @tailrec
@@ -58,9 +59,9 @@ object Func {
       case Right((expr, Token(")")::tail)) =>
         Right((expr::args).reverse -> tail)
       case Right((expr, head::tail)) =>
-        Left(s"""Invalid argument list: expected "," or ")" got "$head"!""")
+        Left(s"""Invalid argument list: expected "," or ")" got "${head.body}"!""" -> head.idx)
       case Right((expr, Nil)) =>
-        Left("""Unexpected end of transform while looking for matching ")"!""")
+        Left("""Unexpected end of transform while looking for matching ")"!""" -> expr.endIdx)
       case Left(err) => Left(err)
     }
   }

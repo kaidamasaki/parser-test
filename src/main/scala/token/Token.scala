@@ -3,6 +3,7 @@ package token
 
 case class Token(body: String)(val idx: Int) {
   override def toString = s"Token($body, $idx)"
+  val endIdx = idx + body.length
 }
 
 object Token {

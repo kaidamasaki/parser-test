@@ -18,13 +18,16 @@ object Transform {
   def apply(definition: String): Either[String, Transform] = symbolize(definition) match {
     case Symbol('[')::inner => for {
       tokens <- tokenizeInner(inner).right
-      body <- parseBody(tokens).right
-    } yield body match {
-      case (transform, _) => transform
-    }
+      transform <- extractResult(parseBody(tokens)).right
+    } yield transform
 
     case head::_ => Left(s"""Expected "[" got "$head"!""")
     case Nil => Left("""Unexpected end of transform while looking for "["!""")
+  }
+
+  def extractResult(result: Result[Transform]): Either[String, Transform] = result match {
+    case Left((msg, idx)) => Left(s"""$msg\n${" " * idx + "^"}""")
+    case Right((transform, _)) => Right(transform)
   }
 
   def symbolize(definition: String): List[Symbol] = definition.zipWithIndex.map(Symbol.fromTuple).toList
@@ -36,9 +39,9 @@ object Transform {
       Expr(tokens) match {
         case Right((expr, Nil)) => parseBody(Nil, expr::exprs)
         case Right((expr, Token(",")::rest)) => parseBody(rest, expr::exprs)
-        case Right((expr, _)) => Left("Missing comma!")
+        case Right((expr, _)) => Left("Missing comma!", expr.endIdx)
         case Left(err) => Left(err)
-        case _ => Util.unexpected
+        case _ => Util.unexpectedEnd
       }
     }
   }

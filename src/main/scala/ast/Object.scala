@@ -8,7 +8,7 @@ import com.rojoma.json.v3.ast.{JObject, JValue}
 
 import token.Token
 
-case class Object(underlying: Map[Expr, Expr])(val idx: Int) extends Expr {
+case class Object(underlying: Map[Expr, Expr])(val idx: Int, val endIdx: Int) extends Expr {
   def apply(bindings: Map[String, String]) = toJson(bindings).map(JsonUtil.renderJson(_))
 
   override def toJson(bindings: Map[String, String]) = {
@@ -25,9 +25,10 @@ case class Object(underlying: Map[Expr, Expr])(val idx: Int) extends Expr {
 
 object Object extends Parser[Object] {
   def apply(tokens: List[Token]) = tokens match {
-    case left::Token("}")::tail if left.body == "{" => Right(Object(Map[Expr, Expr]())(left.idx) -> tail)
-    case left::tail if left.body == "{" => parseBody(tail, left.idx)
-    case _ => Left("Malformed object!")
+    case open::close::tail if open.body == "{" && close.body == "}" =>
+      Right(Object(Map[Expr, Expr]())(open.idx, close.idx) -> tail)
+    case open::tail if open.body == "{" => parseBody(tail, open.idx)
+    case _ => Util.unexpectedEnd
   }
 
   @tailrec
@@ -39,19 +40,19 @@ object Object extends Parser[Object] {
       parseBody(tail, idx, Some(key), pairs)
     case (Right((value, Token(",")::tail)), Some(key)) =>
       parseBody(tail, idx, None, (key -> value)::pairs)
-    case (Right((value, Token("}")::tail)), Some(key)) =>
-      Right(Object(((key -> value)::pairs).reverse.toMap)(idx) -> tail)
+    case (Right((value, close::tail)), Some(key)) if close.body == "}" =>
+      Right(Object(((key -> value)::pairs).reverse.toMap)(idx, close.idx) -> tail)
     // Error handling!
     case (Right((key, Token(":")::tail)), Some(_)) =>
-      Left(s"""Malformed object: expected value got "$key:"!""")
+      Left(s"""Malformed object: expected value got "${key.src}:"!""" -> key.idx)
     case (Right((value, Token(",")::tail)), None) =>
-      Left(s"""Malformed object: expected KEY : VALUE got "$value,"!""")
+      Left(s"""Malformed object: expected KEY : VALUE got "${value.src},"!""" -> value.idx)
     case (Right((value, Token("}")::tail)), None) =>
-      Left(s"""Malformed object: expected KEY: VALUE got "$value}"!""")
+      Left(s"""Malformed object: expected KEY: VALUE got "${value.src}}"!""" -> value.idx)
     case (Right((expr, unexp::tail)), _) =>
-      Left(s"""Malformed object: unexpected character "$unexp"!""")
+      Left(s"""Malformed object: unexpected character "${unexp.body}"!""" -> unexp.idx)
     case (Right((expr, Nil)), _) =>
-      Left(s"""Malformed object: unexpected end of transform!""")
+      Util.unexpectedEnd
     case (Left(err), _) => Left(err)
   }
 }

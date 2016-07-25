@@ -6,8 +6,14 @@ import ast.{Parser, Result}
 import token.Token
 
 object Util {
-  private[importer] def unexpected[T](implicit tag: ClassTag[T]): Result[T] = {
-    Left(s"Unexpected error whlie parsing ${tag.runtimeClass.getSimpleName}!")
+  private val EndOfFile = -1
+
+  private[importer] def unexpected[T](idx: Int)(implicit tag: ClassTag[T]): Result[T] = {
+    Left(s"Unexpected error while parsing ${tag.runtimeClass.getSimpleName}!" -> idx)
+  }
+
+  private[importer] def unexpectedEnd[T](implicit tag: ClassTag[T]): Result[T] = {
+    Left(s"Unexpected end of transform while parsing ${tag.runtimeClass.getSimpleName}!" -> EndOfFile)
   }
 
   private[importer] val stateCodes = Map(
@@ -66,12 +72,13 @@ object Util {
   private[importer] def sequence[T](list: List[Option[T]]) =
     if (list.forall(_.isDefined)) Some(list.collect { case Some(item) => item }) else None
 
-  private[importer] def chain[T](in: List[Token])(parsers: Parser[T]*)(implicit tag: ClassTag[T]): Result[T] =
+  private[importer] def chain[T] (in: List[Token], last: Option[ast.Error] = None)(parsers: Parser[T]*)
+                             (implicit tag: ClassTag[T]): Result[T] =
     parsers.toList match {
       case head::tail => head(in) match {
         case expr @ Right(_) => expr
-        case Left(_) => chain(in)(tail: _*)
+        case Left(err) => chain(in, Some(err))(tail: _*)
       }
-      case Nil => unexpected[T]
+      case Nil => Left(last.get)
     }
 }

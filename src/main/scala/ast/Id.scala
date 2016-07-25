@@ -4,6 +4,8 @@ package ast
 import token.Token
 
 case class Id(name: String)(val idx: Int) extends Expr {
+  val endIdx = idx + name.length
+
   def apply(bindings: Map[String, String]) = Some(bindings.getOrElse(name, ""))
 }
 
@@ -13,9 +15,9 @@ object Id extends Parser[Id] {
 
   def apply(token: Token): Id = Id(token.body)(token.idx)
 
-  def apply(tokens: List[Token]) = tokens match {
-    case head::Token(":")::tail => Left("""Unexpected ":"!""")
+  def apply(tokens: List[Token]): Result[Id] = tokens match {
+    case head::tok::tail if tok.body == ":" => Left("""Unexpected ":"!""" -> tok.endIdx)
     case head::tail if regex(head.body).matches => Right(Id(head) -> tail)
-    case _ => Left("""Invalid identifier!""")
+    case _ => Util.unexpectedEnd
   }
 }
