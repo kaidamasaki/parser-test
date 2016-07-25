@@ -4,6 +4,7 @@ package ast
 import scala.annotation.tailrec
 
 import token.Token
+import Util.SuccessEither
 
 case class Func(name: String, args: List[Expr], self: Option[Expr], idx: Int) extends Expr {
   lazy val endIdx = (args.map(_.endIdx) :+ (idx + name.length)).reduceLeft(_ max _) + 1
@@ -26,14 +27,14 @@ case class Func(name: String, args: List[Expr], self: Option[Expr], idx: Int) ex
       expr(bindings).map { str => str.slice(beg.value, end.value) }
     case ("replace", RegexLiteral(pattern, global, _)::(toExpr: Expr)::Nil, Some(fromExpr)) =>
       for {
-        from <- fromExpr(bindings);
-        to <- toExpr(bindings)
+        from <- fromExpr(bindings).right
+        to <- toExpr(bindings).right
       } yield {
         val matcher = pattern.matcher(from)
         if (global) matcher.replaceAll(to) else matcher.replaceFirst(to)
       }
     case ("stringify", (obj:Object)::Nil, Some(Id("JSON"))) => obj(bindings)
-    case _ => None
+    case _ => Left(s"Incorrect arguments: $src." -> idx)
   }
 
   // case class Func(name: String, args: List[Expr], self: Option[Expr]) extends Expr {
@@ -45,7 +46,7 @@ object Func {
     case (id: Id, Token(")")::tail) =>
       Right(Func(id.name, Nil, self, id.idx) -> tail)
     case (id: Id, head::tail) =>
-      parseArguments(tokens).right.map { case (args, rest) =>
+      parseArguments(tokens).collect { case (args, rest) =>
         Func(id.name, args, self, id.idx) -> rest
       }
     case _ => Util.unexpectedEnd

@@ -6,7 +6,7 @@ import token.Token
 case class Id(name: String)(val idx: Int) extends Expr {
   val endIdx = idx + name.length
 
-  def apply(bindings: Map[String, String]) = Some(bindings.getOrElse(name, ""))
+  def apply(bindings: Map[String, String]) = Right(bindings.getOrElse(name, ""))
 }
 
 object Id extends Parser[Id] {

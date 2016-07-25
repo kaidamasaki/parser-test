@@ -9,16 +9,16 @@ import com.rojoma.json.v3.ast.{JObject, JValue}
 import token.Token
 
 case class Object(underlying: Map[Expr, Expr])(val idx: Int, val endIdx: Int) extends Expr {
-  def apply(bindings: Map[String, String]) = toJson(bindings).map(JsonUtil.renderJson(_))
+  def apply(bindings: Map[String, String]) = toJson(bindings).right.map(JsonUtil.renderJson(_))
 
   override def toJson(bindings: Map[String, String]) = {
-    val evaluated: Map[Option[String], Option[JValue]] =
+    val evaluated: Map[Either[Error, String], Either[Error, JValue]] =
       underlying.collect { case (keyExp, valExp) => keyExp(bindings) -> valExp.toJson(bindings) }
 
-    if (evaluated.forall { case (k, v) => k.isDefined && v.isDefined }) {
-      Some(JObject(evaluated.collect { case (Some(key), Some(value)) => key -> value }))
+    if (evaluated.forall { case (k, v) => k.isRight && v.isRight }) {
+      Right(JObject(evaluated.collect { case (Right(key), Right(value)) => key -> value }))
     } else {
-      None
+      Left("Failed to convert $src to JSON!" -> idx)
     }
   }
 }

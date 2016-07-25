@@ -5,12 +5,14 @@ import scala.annotation.tailrec
 
 import token.{Symbol, Token}
 
+import Transform._
+
 case class Transform(expressions: List[Expr]) {
-  def apply(row: List[String]): Option[List[String]] = {
+  def apply(row: List[String]): Either[String, List[String]] = {
     val bindings = row.zipWithIndex.map { case (cell, idx) => s"col${idx + 1}" -> cell }.toMap
     val parts = expressions.map { e => e(bindings) }
 
-    Util.sequence(parts)
+    extractResult(Util.sequence(parts))
   }
 }
 
@@ -18,16 +20,19 @@ object Transform {
   def apply(definition: String): Either[String, Transform] = symbolize(definition) match {
     case Symbol('[')::inner => for {
       tokens <- tokenizeInner(inner).right
-      transform <- extractResult(parseBody(tokens)).right
-    } yield transform
+      res <- extractResult(parseBody(tokens)).right
+    } yield {
+      val (transform, _) = res
+      transform
+    }
 
     case head::_ => Left(s"""Expected "[" got "$head"!""")
     case Nil => Left("""Unexpected end of transform while looking for "["!""")
   }
 
-  def extractResult(result: Result[Transform]): Either[String, Transform] = result match {
+  def extractResult[T](result: Either[Error, T]): Either[String, T] = result match {
     case Left((msg, idx)) => Left(s"""$msg\n${" " * idx + "^"}""")
-    case Right((transform, _)) => Right(transform)
+    case Right(res) => Right(res)
   }
 
   def symbolize(definition: String): List[Symbol] = definition.zipWithIndex.map(Symbol.fromTuple).toList

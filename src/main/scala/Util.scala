@@ -69,8 +69,18 @@ object Util {
     "wyoming" -> "WY"
   )
 
-  private[importer] def sequence[T](list: List[Option[T]]) =
-    if (list.forall(_.isDefined)) Some(list.collect { case Some(item) => item }) else None
+  implicit class SuccessEither[F,S](underlying: Either[F,S]) {
+    def map[T](f: S => T): Either[F,T] = underlying.right.map(f)
+    def collect[T](f: PartialFunction[S,T]): Either[F,T] = underlying.right.map(i => f(i))
+  }
+
+  private[importer] def sequence[T](list: List[Either[ast.Error, T]]): Either[ast.Error, List[T]] = {
+    list.find(_.isLeft) match {
+      case Some(Left(err)) => Left(err)
+      case None => Right(list.collect { case Right(item) => item })
+      case _ => throw new IllegalStateException("Type should already have been verified with find(_.isLeft)!")
+    }
+  }
 
   private[importer] def chain[T] (in: List[Token], last: Option[ast.Error] = None)(parsers: Parser[T]*)
                              (implicit tag: ClassTag[T]): Result[T] =

@@ -8,8 +8,8 @@ import com.rojoma.json.v3.ast.{JString, JValue}
 import token.Token
 
 trait Expr {
-  def apply(bindings: Map[String,String]): Option[String]
-  def toJson(bindings: Map[String, String]): Option[JValue] = apply(bindings).map(JString)
+  def apply(bindings: Map[String,String]): Either[Error, String]
+  def toJson(bindings: Map[String, String]): Either[Error, JValue] = apply(bindings).right.map(JString)
   def idx: Int
   def endIdx: Int
   def src: String = toString // TODO: make useful for the user!

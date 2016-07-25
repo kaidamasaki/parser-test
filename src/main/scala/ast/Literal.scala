@@ -8,7 +8,7 @@ import com.rojoma.json.v3.ast.JNumber
 import token.Token
 
 class Literal(val body: String, val delim: Option[String], val idx: Int) extends Expr {
-  def apply(bindings: Map[String, String]) = Some(body)
+  def apply(bindings: Map[String, String]) = Right(body)
 
   lazy val endIdx = idx + body.length + 2 * delim.getOrElse("").length
 
@@ -20,7 +20,7 @@ class Literal(val body: String, val delim: Option[String], val idx: Int) extends
 }
 
 case class IntLiteral(value: Int)(idx: Int) extends Literal(value.toString, None, idx) {
-  override def toJson(bindings: Map[String, String]) = Some(JNumber(value))
+  override def toJson(bindings: Map[String, String]) = Right(JNumber(value))
 }
 
 case class RegexLiteral(regex: Pattern, global: Boolean, flags: String)(idx: Int)
