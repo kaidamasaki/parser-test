@@ -18,6 +18,7 @@ object Main {
 
     val tree = ast.Transform(spec)
     println(tree)
+
     tree match {
       case Right(parsed) => println(parsed(row))
       case Left(err) => println(err)

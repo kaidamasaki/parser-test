@@ -7,17 +7,21 @@ import token.{Symbol, Token}
 
 import Transform._
 
-case class Transform(expressions: List[Expr]) {
+case class Transform(expressions: List[Expr]) extends Transformation {
   def apply(row: List[String]): Either[String, List[String]] = {
     val bindings = row.zipWithIndex.map { case (cell, idx) => s"col${idx + 1}" -> cell }.toMap
     val parts = expressions.map { e => e(bindings) }
 
     extractResult(Util.sequence(parts))
   }
+
+  override def toString = s"Transform(${expressions})"
 }
 
 object Transform {
-  def apply(definition: String): Either[String, Transform] = symbolize(definition) match {
+  type Transformation = List[String] => Either[String, List[String]]
+
+  def apply(definition: String): Either[String, Transformation] = symbolize(definition) match {
     case Symbol('[')::inner => for {
       tokens <- tokenizeInner(inner).right
       res <- extractResult(parseBody(tokens)).right
