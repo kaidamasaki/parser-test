@@ -1,4 +1,4 @@
-package com.socrata.ice.importer
+package com.socrata.ice.translate
 
 import scala.reflect.ClassTag
 
@@ -8,15 +8,15 @@ import token.Token
 object Util {
   private val EndOfFile = -1
 
-  private[importer] def unexpected[T](idx: Int)(implicit tag: ClassTag[T]): Result[T] = {
+  private[translate] def unexpected[T](idx: Int)(implicit tag: ClassTag[T]): Result[T] = {
     Left(s"Unexpected error while parsing ${tag.runtimeClass.getSimpleName}!" -> idx)
   }
 
-  private[importer] def unexpectedEnd[T](implicit tag: ClassTag[T]): Result[T] = {
+  private[translate] def unexpectedEnd[T](implicit tag: ClassTag[T]): Result[T] = {
     Left(s"Unexpected end of transform while parsing ${tag.runtimeClass.getSimpleName}!" -> EndOfFile)
   }
 
-  private[importer] val stateCodes = Map(
+  private[translate] val stateCodes = Map(
     "alabama" -> "AL",
     "alaska" -> "AK",
     "arizona" -> "AZ",
@@ -74,7 +74,7 @@ object Util {
     def collect[T](f: PartialFunction[S,T]): Either[F,T] = underlying.right.map(i => f(i))
   }
 
-  private[importer] def sequence[T](list: List[Either[ast.Error, T]]): Either[ast.Error, List[T]] = {
+  private[translate] def sequence[T](list: List[Either[ast.Error, T]]): Either[ast.Error, List[T]] = {
     list.find(_.isLeft) match {
       case Some(Left(err)) => Left(err)
       case None => Right(list.collect { case Right(item) => item })
@@ -82,7 +82,7 @@ object Util {
     }
   }
 
-  private[importer] def chain[T] (in: List[Token], last: Option[ast.Error] = None)(parsers: Parser[T]*)
+  private[translate] def chain[T] (in: List[Token], last: Option[ast.Error] = None)(parsers: Parser[T]*)
                              (implicit tag: ClassTag[T]): Result[T] =
     parsers.toList match {
       case head::tail => head(in) match {

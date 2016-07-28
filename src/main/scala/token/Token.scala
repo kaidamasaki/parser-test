@@ -1,4 +1,4 @@
-package com.socrata.ice.importer
+package com.socrata.ice.translate
 package token
 
 case class Token(body: String)(val idx: Int) {

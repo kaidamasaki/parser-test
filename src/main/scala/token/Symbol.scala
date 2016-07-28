@@ -1,4 +1,4 @@
-package com.socrata.ice.importer
+package com.socrata.ice.translate
 package token
 
 case class Symbol(char: Char)(val idx: Int) {

@@ -1,4 +1,4 @@
-package com.socrata.ice.importer
+package com.socrata.ice.translate
 package ast
 
 import java.util.regex.Pattern

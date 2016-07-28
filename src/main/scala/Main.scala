@@ -1,4 +1,4 @@
-package com.socrata.ice.importer
+package com.socrata.ice.translate
 
 object Main {
   def main(args: Array[String]) {
